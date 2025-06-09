@@ -6,8 +6,7 @@ Our greatest asset is our people — and their growth. We invest in tools and ha
 
 ## 🧠 For CoderPush Team Members
 
-👉 Our internal knowledge base lives  
-[**HERE**](https://github.com/orgs/CoderPush/discussions)
+👉 Our internal knowledge base lives [**HERE**](https://github.com/orgs/CoderPush/discussions)
 
 That’s where we:
 - Ask and answer questions
