@@ -37,3 +37,5 @@ The worker expects:
   `organization` event with action `member_added`.
 - If your org uses IdP team sync, GitHub may block API-driven team membership
   changes.
+- The old GitHub Actions workflow was removed because the worker now handles
+  team membership directly.

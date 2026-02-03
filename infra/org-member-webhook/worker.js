@@ -2,21 +2,30 @@ const encoder = new TextEncoder();
 
 export default {
   async fetch(request, env) {
+    const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/health") {
+      return jsonResponse({ ok: true, service: "org-member-webhook" });
+    }
+
     if (request.method !== "POST") {
       return jsonResponse({ error: "Method not allowed" }, 405);
     }
 
     const event = request.headers.get("X-GitHub-Event") || "";
+    const deliveryId = request.headers.get("X-GitHub-Delivery") || "unknown";
     const signature = request.headers.get("X-Hub-Signature-256") || "";
     const rawBody = await request.text();
 
     const secret = env.GITHUB_WEBHOOK_SECRET;
     if (!secret) {
+      console.log("Missing GITHUB_WEBHOOK_SECRET");
       return jsonResponse({ error: "Missing webhook secret" }, 500);
     }
 
     const signatureOk = await verifySignature(signature, rawBody, secret);
     if (!signatureOk) {
+      console.log("Invalid signature for event", { event, deliveryId });
       return jsonResponse({ error: "Invalid signature" }, 401);
     }
 
@@ -24,19 +33,23 @@ export default {
     try {
       payload = JSON.parse(rawBody);
     } catch {
+      console.log("Invalid JSON payload", { deliveryId });
       return jsonResponse({ error: "Invalid JSON" }, 400);
     }
 
     if (event === "ping") {
+      console.log("Ping received", { deliveryId });
       return jsonResponse({ ok: true });
     }
 
     if (event !== "organization") {
+      console.log("Ignoring event", { event, deliveryId });
       return jsonResponse({ ok: true, ignored: event }, 202);
     }
 
     const action = payload.action || "";
     if (action !== "member_added") {
+      console.log("Ignoring organization action", { action, deliveryId });
       return jsonResponse({ ok: true, ignored: action }, 202);
     }
 
@@ -45,11 +58,13 @@ export default {
       payload?.user?.login ||
       payload?.invitation?.login;
     if (!username) {
+      console.log("Missing username in payload", { deliveryId });
       return jsonResponse({ error: "Missing member username" }, 400);
     }
 
     const installationId = payload?.installation?.id;
     if (!installationId) {
+      console.log("Missing installation id", { deliveryId });
       return jsonResponse({ error: "Missing installation id" }, 400);
     }
 
@@ -59,13 +74,32 @@ export default {
     const privateKey = env.GITHUB_APP_PRIVATE_KEY;
 
     if (!org || !teamSlug || !appId || !privateKey) {
+      console.log("Missing required env vars", {
+        hasOrg: Boolean(org),
+        hasTeam: Boolean(teamSlug),
+        hasAppId: Boolean(appId),
+        hasPrivateKey: Boolean(privateKey),
+        deliveryId,
+      });
       return jsonResponse({ error: "Missing required environment variables" }, 500);
     }
+
+    console.log("Processing member add", {
+      org,
+      team: teamSlug,
+      user: username,
+      installationId,
+      deliveryId,
+    });
 
     let jwt;
     try {
       jwt = await createAppJwt(appId, privateKey);
     } catch (error) {
+      console.log("JWT creation failed", {
+        error: error?.message || error,
+        deliveryId,
+      });
       return jsonResponse({ error: error.message || "Failed to create JWT" }, 500);
     }
 
@@ -73,6 +107,10 @@ export default {
     try {
       token = await getInstallationToken(installationId, jwt);
     } catch (error) {
+      console.log("Installation token failed", {
+        error: error?.message || error,
+        deliveryId,
+      });
       return jsonResponse(
         { error: error.message || "Failed to get installation token" },
         500
@@ -82,12 +120,22 @@ export default {
     try {
       await addUserToTeam(org, teamSlug, username, token);
     } catch (error) {
+      console.log("Add member failed", {
+        error: error?.message || error,
+        deliveryId,
+      });
       return jsonResponse(
         { error: error.message || "Failed to add user to team" },
         500
       );
     }
 
+    console.log("Added member to team", {
+      org,
+      team: teamSlug,
+      user: username,
+      deliveryId,
+    });
     return jsonResponse({ ok: true, user: username });
   },
 };
