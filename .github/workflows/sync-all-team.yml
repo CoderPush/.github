@@ -1,0 +1,17 @@
+name: Sync new members to "all" team
+
+on:
+  organization:
+    types: [member_added]
+
+jobs:
+  add-to-all-team:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add new member to "all" team
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+        run: |
+          gh api -X PUT "orgs/CoderPush/teams/all/memberships/${{ github.event.membership.user.login }}" \
+            -f role=member
+          echo "Added ${{ github.event.membership.user.login }} to the all team"
