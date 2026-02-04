@@ -1,8 +1,0 @@
-name = "coderpush-org-member-webhook"
-main = "worker.js"
-compatibility_date = "2025-01-01"
-
-[vars]
-ORG_NAME = "CoderPush"
-TEAM_SLUG = "all"
-APP_ID = "2788176"
